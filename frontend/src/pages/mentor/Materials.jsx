@@ -51,9 +51,14 @@ export default function Materials() {
   const handleAdd = async (e) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...newMaterial,
+        session_id: newMaterial.session_id || null
+      };
+
       const { error } = await supabase
         .from('materials')
-        .insert([newMaterial]);
+        .insert([payload]);
 
       if (error) throw error;
       
@@ -99,7 +104,7 @@ export default function Materials() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <header className="flex items-end justify-between gap-6">
+      <header className="flex items-end justify-between gap-6 select-none cursor-default">
         <div className="space-y-1">
           <h1 className="text-display-sm text-primary font-display">Study Materials</h1>
           <p className="text-secondary">Shared resources, notebooks, and session recordings.</p>
@@ -155,12 +160,16 @@ export default function Materials() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-secondary">Related Session (Optional)</label>
               <select 
-                className="input"
+                className="input bg-void"
                 value={newMaterial.session_id}
                 onChange={(e) => setNewMaterial({...newMaterial, session_id: e.target.value})}
               >
                 <option value="">No specific session</option>
-                {sessions.map(s => <option key={s.id} value={s.id}>{new Date(s.date).toLocaleDateString()} - {s.topic}</option>)}
+                {sessions.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {new Date(s.date).toLocaleDateString()} - {s.topic}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="md:col-span-2 space-y-1.5">
@@ -203,8 +212,8 @@ export default function Materials() {
 
               <div className="mt-6 pt-4 border-t border-[#ffffff05] flex flex-col gap-3">
                 {m.sessions && (
-                  <div className="flex items-center gap-2 text-[10px] text-tertiary uppercase font-black tracking-widest">
-                    <Calendar size={12} /> {new Date(m.sessions.date).toLocaleDateString()}
+                  <div className="flex items-center gap-2 text-[10px] text-[#6366F1] font-black uppercase tracking-widest bg-[#6366F108] px-2 py-1 rounded-md border border-[#6366F110] w-fit">
+                    <Calendar size={12} /> {new Date(m.sessions.date).toLocaleDateString()} • {m.sessions.topic}
                   </div>
                 )}
                 <a 

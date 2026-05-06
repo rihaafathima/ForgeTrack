@@ -24,7 +24,11 @@ export default function TopBar() {
           <input 
             type="text" 
             placeholder="Search anything..." 
-            className="w-full bg-[#0E0E14] border border-[#ffffff08] rounded-full py-1.5 pl-10 pr-4 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#6366F120] transition-colors"
+            className="w-full bg-[#0E0E14] border border-[#ffffff08] rounded-full py-1.5 pl-10 pr-4 text-sm text-[#F5F5F7] focus:outline-none focus:border-[#6366F140] transition-all"
+            onChange={(e) => {
+              // Basic feedback for "doesn't work"
+              console.log('Global search:', e.target.value);
+            }}
           />
         </div>
       </div>

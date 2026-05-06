@@ -93,6 +93,21 @@ body {
   font-family: var(--font-body);
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+}
+
+/* Global Non-Editable Fix */
+body *:not(input):not(textarea):not(select):not([contenteditable="true"]):not(a):not(button):not(label) {
+  cursor: default;
+  user-select: none;
+}
+
+a, button, label, select, input, textarea {
+  cursor: pointer;
+}
+
+input, textarea {
+  cursor: text;
 }
 
 .app-main {

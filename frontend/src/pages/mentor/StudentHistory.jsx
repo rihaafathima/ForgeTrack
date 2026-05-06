@@ -9,6 +9,7 @@ export default function StudentHistory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentDetails, setStudentDetails] = useState([]);
+  const [sessionSearch, setSessionSearch] = useState('');
 
   useEffect(() => {
     fetchHistory();
@@ -75,9 +76,39 @@ export default function StudentHistory() {
     }
   }
 
+  const handleExport = () => {
+    if (!selectedStudent || studentDetails.length === 0) return;
+    
+    const headers = ['Date', 'Topic', 'Status'];
+    const rows = studentDetails.map(record => [
+      new Date(record.sessions.date).toLocaleDateString(),
+      record.sessions.topic,
+      record.present ? 'Present' : 'Absent'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Attendance_${selectedStudent.name.replace(/\s+/g, '_')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
     s.usn.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDetails = studentDetails.filter(record => 
+    record.sessions.topic.toLowerCase().includes(sessionSearch.toLowerCase())
   );
 
   if (loading && !selectedStudent) {
@@ -93,7 +124,10 @@ export default function StudentHistory() {
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-500">
         <button 
-          onClick={() => setSelectedStudent(null)}
+          onClick={() => {
+            setSelectedStudent(null);
+            setSessionSearch('');
+          }}
           className="flex items-center gap-2 text-secondary hover:text-primary transition-colors text-sm font-medium"
         >
           <ArrowLeft size={16} /> Back to Overview
@@ -104,7 +138,7 @@ export default function StudentHistory() {
             <div className="h-20 w-20 rounded-2xl bg-[#6366F1] flex items-center justify-center text-3xl font-bold text-white shadow-lg">
               {selectedStudent.name.charAt(0)}
             </div>
-            <div>
+            <div className="select-none cursor-default">
               <h1 className="text-display-sm text-primary font-display">{selectedStudent.name}</h1>
               <div className="flex items-center gap-4 text-secondary text-sm mt-1">
                 <span className="font-mono">{selectedStudent.usn}</span>
@@ -130,11 +164,26 @@ export default function StudentHistory() {
         </header>
 
         <div className="card overflow-hidden">
-          <div className="p-6 border-b border-[#ffffff05] flex items-center justify-between">
+          <div className="p-6 border-b border-[#ffffff05] flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h2 className="text-h2 font-display text-primary text-lg">Attendance Timeline</h2>
-            <button className="text-accent-glow text-sm font-bold flex items-center gap-2 hover:underline">
-              <Download size={16} /> Export Report
-            </button>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-tertiary" size={14} />
+                <input 
+                  type="text" 
+                  placeholder="Filter sessions..." 
+                  className="input pl-10 h-9 text-xs w-48 bg-[#ffffff03]"
+                  value={sessionSearch}
+                  onChange={(e) => setSessionSearch(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={handleExport}
+                className="btn-secondary px-4 py-2 text-xs font-bold flex items-center gap-2 hover:bg-[#6366F1] hover:text-white transition-all"
+              >
+                <Download size={14} /> Export Report
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -146,8 +195,8 @@ export default function StudentHistory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#ffffff03]">
-                {studentDetails.length > 0 ? (
-                  studentDetails.map((record, i) => (
+                {filteredDetails.length > 0 ? (
+                  filteredDetails.map((record, i) => (
                     <tr key={i} className="hover:bg-[#ffffff02] transition-colors">
                       <td className="px-8 py-4 text-sm font-medium text-primary">
                         {new Date(record.sessions.date).toLocaleDateString()}
@@ -168,7 +217,7 @@ export default function StudentHistory() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="3" className="px-8 py-12 text-center text-secondary italic">No records found for this student.</td>
+                    <td colSpan="3" className="px-8 py-12 text-center text-secondary italic">No records matching your search.</td>
                   </tr>
                 )}
               </tbody>
@@ -182,7 +231,7 @@ export default function StudentHistory() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
+        <div className="space-y-1 select-none cursor-default">
           <h1 className="text-display-sm text-primary font-display">Student Records</h1>
           <p className="text-secondary">Comprehensive analytics of the current cohort.</p>
         </div>
@@ -192,7 +241,8 @@ export default function StudentHistory() {
           <input 
             type="text" 
             placeholder="Filter students..." 
-            className="input pl-10 h-10 py-0 text-sm"
+            className="input h-10 py-0 text-sm"
+            style={{ paddingLeft: '3.5rem' }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
