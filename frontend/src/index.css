@@ -85,6 +85,7 @@
     rgba(255, 255, 255, 0.02) 0%,
     rgba(255, 255, 255, 0) 50%
   );
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3), 0 0 40px rgba(99, 102, 241, 0.1);
 }
 
 body {
@@ -165,6 +166,22 @@ input, textarea {
   outline: none;
 }
 .input::placeholder { color: var(--text-tertiary); }
+
+.badge-outline {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface-raised);
+  color: var(--text-secondary);
+  font: 600 10px var(--font-body);
+  letter-spacing: 0.05em;
+}
+
+.shadow-glow {
+  box-shadow: var(--shadow-glow);
+}
 
 .pill {
   display: inline-flex; align-items: center; gap: 4px;

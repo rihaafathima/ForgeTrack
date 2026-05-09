@@ -12,6 +12,7 @@ import MarkAttendance from './pages/mentor/MarkAttendance';
 import StudentHistory from './pages/mentor/StudentHistory';
 import Materials from './pages/mentor/Materials';
 import UploadCSV from './pages/mentor/UploadCSV';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Student Pages
 import MyAttendance from './pages/student/MyAttendance';
@@ -52,7 +53,7 @@ export default function App() {
             <Route path="attendance" element={<MarkAttendance />} />
             <Route path="history" element={<StudentHistory />} />
             <Route path="materials" element={<Materials />} />
-            <Route path="upload" element={<UploadCSV />} />
+            <Route path="upload" element={<ErrorBoundary><UploadCSV /></ErrorBoundary>} />
           </Route>
 
           {/* Protected Student Routes */}

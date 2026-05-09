@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, CheckSquare, Users, BookOpen, Upload, UserCheck, Calendar, LogOut } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Users, BookOpen, Upload, UserCheck, Calendar, LogOut, Brain } from 'lucide-react';
 
 export default function Sidebar() {
   const { dbUser, signOut } = useAuth();
@@ -13,7 +13,7 @@ export default function Sidebar() {
       { name: 'Student History', path: '/history', icon: Users },
       { name: 'Materials', path: '/materials', icon: BookOpen },
     ]},
-    { label: 'Data', items: [{ name: 'Upload CSV', path: '/upload', icon: Upload }] }
+    { label: 'Data', items: [{ name: 'AI Bulk Sync', path: '/upload', icon: Brain }] }
   ];
 
   const studentNav = [

@@ -8,6 +8,8 @@ export default function Dashboard() {
     totalStudents: 0,
     activeSessions: 0,
     avgAttendance: 0,
+    engagement: 0,
+    courseProgress: 0,
     nextSession: null
   });
   const [loading, setLoading] = useState(true);
@@ -17,20 +19,45 @@ export default function Dashboard() {
       try {
         setLoading(true);
         
+        // Fetch total students
         const { count: studentCount } = await supabase
           .from('students')
           .select('*', { count: 'exact', head: true });
 
+        // Fetch sessions
         const { data: sessions } = await supabase
           .from('sessions')
           .select('*')
-          .order('date', { ascending: false })
-          .limit(5);
+          .order('date', { ascending: false });
+        
+        // Calculate average attendance
+        const { data: attendanceData } = await supabase
+          .from('attendance')
+          .select('present');
+        
+        let avg = 0;
+        if (attendanceData && attendanceData.length > 0) {
+          const presentCount = attendanceData.filter(a => a.present).length;
+          avg = Math.round((presentCount / attendanceData.length) * 100);
+        }
+
+        // Calculate engagement (simple metric: attendance rate + some factor or just attendance for now)
+        // For now, let's keep it 0 if no data, or a placeholder if data exists
+        let engagement = 0;
+        if (sessions && sessions.length > 0) {
+          engagement = Math.min(100, Math.round(avg * 1.1)); // Placeholder logic
+        }
+
+        // Course progress (sessions held vs expected sessions, e.g., 30)
+        const expectedSessions = 30;
+        const progress = sessions ? Math.round((sessions.length / expectedSessions) * 100) : 0;
         
         setStats({
           totalStudents: studentCount || 0,
           activeSessions: sessions?.length || 0,
-          avgAttendance: 84, 
+          avgAttendance: avg,
+          engagement: engagement,
+          courseProgress: progress,
           nextSession: sessions?.[0] || null
         });
       } catch (err) {
@@ -56,7 +83,7 @@ export default function Dashboard() {
     { label: 'Total Students', value: stats.totalStudents, icon: Users, color: 'text-accent-glow', bg: 'bg-accent-glow-soft' },
     { label: 'Sessions Held', value: stats.activeSessions, icon: Calendar, color: 'text-info-fg', bg: 'bg-info-bg' },
     { label: 'Avg. Attendance', value: `${stats.avgAttendance}%`, icon: CheckCircle, color: 'text-success-fg', bg: 'bg-success-bg' },
-    { label: 'Engagement', value: '+12%', icon: TrendingUp, color: 'text-warning-fg', bg: 'bg-warning-bg' },
+    { label: 'Engagement', value: `${stats.engagement > 0 ? '+' : ''}${stats.engagement}%`, icon: TrendingUp, color: 'text-warning-fg', bg: 'bg-warning-bg' },
   ];
 
   return (
@@ -109,29 +136,31 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <h2 className="text-h2 font-display text-primary">Next Milestone</h2>
-          <Link to="/materials" className="block card p-6 border-accent-glow/20 bg-accent-glow/5 relative overflow-hidden group hover:border-accent-glow/40 transition-all duration-500">
-            <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
-              <BookOpen size={120} />
-            </div>
-            <div className="relative z-10">
-              <div className="pill pill-success mb-4 px-3 py-1 font-bold">Phase 1 Active</div>
-              <div className="text-lg text-primary font-bold mb-1">Foundational Sprint</div>
-              <div className="text-sm text-secondary mb-8 leading-relaxed">Complete Python and Math for ML basics. All study materials have been uploaded.</div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-micro text-tertiary uppercase font-black tracking-widest">
-                  <span>Course Progress</span>
-                  <span className="text-accent-glow">45%</span>
-                </div>
-                <div className="w-full bg-surface-raised h-1.5 rounded-full overflow-hidden border border-[#ffffff05]">
-                  <div className="bg-accent-glow h-full w-[45%] shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
+        {stats.activeSessions > 0 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-1000 delay-300">
+            <h2 className="text-h2 font-display text-primary">Next Milestone</h2>
+            <Link to="/materials" className="block card p-6 border-accent-glow/20 bg-accent-glow/5 relative overflow-hidden group hover:border-accent-glow/40 transition-all duration-500">
+              <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity">
+                <BookOpen size={120} />
+              </div>
+              <div className="relative z-10">
+                <div className="pill pill-success mb-4 px-3 py-1 font-bold">Phase 1 Active</div>
+                <div className="text-lg text-primary font-bold mb-1">Foundational Sprint</div>
+                <div className="text-sm text-secondary mb-8 leading-relaxed">Complete Python and Math for ML basics. All study materials have been uploaded.</div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between text-micro text-tertiary uppercase font-black tracking-widest">
+                    <span>Course Progress</span>
+                    <span className="text-accent-glow">{stats.courseProgress}%</span>
+                  </div>
+                  <div className="w-full bg-surface-raised h-1.5 rounded-full overflow-hidden border border-[#ffffff05]">
+                    <div className="bg-accent-glow h-full shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000" style={{ width: `${stats.courseProgress}%` }}></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Link>
-        </div>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
