@@ -86,8 +86,8 @@ BEGIN
         RAISE EXCEPTION 'Attendance cannot be marked for a future date';
     END IF;
     
-    IF session_date < '2025-08-04' THEN
-        RAISE EXCEPTION 'Attendance date cannot be before 2025-08-04';
+    IF session_date < '2024-08-04' THEN
+        RAISE EXCEPTION 'Attendance date cannot be before 2024-08-04';
     END IF;
     
     RETURN NEW;

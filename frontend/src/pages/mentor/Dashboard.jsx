@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchAllAttendance } from '../../lib/supabase';
 import { Users, Calendar, CheckCircle, TrendingUp, ArrowRight, BookOpen } from 'lucide-react';
 
 export default function Dashboard() {
@@ -31,9 +31,7 @@ export default function Dashboard() {
           .order('date', { ascending: false });
         
         // Calculate average attendance
-        const { data: attendanceData } = await supabase
-          .from('attendance')
-          .select('present');
+        const attendanceData = await fetchAllAttendance('present');
         
         let avg = 0;
         if (attendanceData && attendanceData.length > 0) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchAllAttendance } from '../../lib/supabase';
 import { 
   Search, Plus, Calendar as CalendarIcon, BookOpen, UserCheck, 
   ChevronRight, ArrowLeft, X, History,
@@ -48,13 +48,18 @@ export default function MarkAttendance() {
 
       const { data: sessionData } = await supabase
         .from('sessions')
-        .select(`*, attendance(present)`)
+        .select('*')
         .order('date', { ascending: false });
 
-      const enrichedSessions = sessionData?.map(s => ({
-        ...s,
-        presentCount: s.attendance?.filter(a => a.present).length || 0
-      })) || [];
+      const attendanceData = await fetchAllAttendance('session_id, present');
+
+      const enrichedSessions = sessionData?.map(s => {
+        const sessionAttendance = attendanceData?.filter(a => a.session_id === s.id && a.present) || [];
+        return {
+          ...s,
+          presentCount: sessionAttendance.length
+        };
+      }) || [];
 
       setSessions(enrichedSessions);
     } catch (err) {

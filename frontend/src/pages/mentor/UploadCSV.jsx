@@ -123,9 +123,23 @@ export default function BulkAttendanceUpload() {
       for (const sheetName of selectedSheets) {
         const mapping = sheetMappings[sheetName];
         if (mapping.hasMissingDateHeaders) {
-          const count = mapping.attendanceColumns.filter(c => c.header === "Unknown").length;
-          const dates = await inferDates(count, scheduleHint, new Date().toISOString().split('T')[0]);
-          newInferredMap[sheetName] = dates; // Should be in DD-MM-YYYY from AI now
+          const unknownIndices = mapping.attendanceColumns
+            .map((c, i) => c.header === "Unknown" ? i : -1)
+            .filter(i => i !== -1);
+            
+          const dates = await inferDates(unknownIndices.length, scheduleHint, new Date().toISOString().split('T')[0]);
+          
+          const alignedDates = new Array(mapping.attendanceColumns.length).fill(null);
+          // Preserve any already mapped or inferred dates
+          if (newInferredMap[sheetName]) {
+            newInferredMap[sheetName].forEach((d, i) => { alignedDates[i] = d; });
+          }
+          
+          unknownIndices.forEach((colIdx, i) => {
+             alignedDates[colIdx] = dates[i];
+          });
+          
+          newInferredMap[sheetName] = alignedDates;
         }
       }
 
@@ -133,17 +147,22 @@ export default function BulkAttendanceUpload() {
       
       // Check for conflicts immediately after getting dates
       const allDates = [];
-      Object.values(sheetMappings).forEach(m => {
-        m.attendanceColumns.forEach(c => {
-          if (c.header !== "Unknown") allDates.push(c.header);
+      Object.entries(sheetMappings).forEach(([sheetName, m]) => {
+        m.attendanceColumns.forEach((c, idx) => {
+          if (c.header !== "Unknown") {
+            allDates.push(c.header);
+          } else if (newInferredMap[sheetName] && newInferredMap[sheetName][idx]) {
+            allDates.push(newInferredMap[sheetName][idx]);
+          }
         });
       });
-      Object.values(newInferredMap).forEach(dates => allDates.push(...dates));
+
+      const formattedDatesToCheck = allDates.map(d => formatExcelDate(d)).filter(Boolean);
 
       const { data: existingSessions } = await supabase
         .from('sessions')
         .select('date')
-        .in('date', allDates.map(d => formatExcelDate(d))); // formatExcelDate handles DD-MM-YYYY too
+        .in('date', formattedDatesToCheck);
 
       if (existingSessions?.length > 0) {
         setConflicts(existingSessions.map(s => s.date));
@@ -166,10 +185,12 @@ export default function BulkAttendanceUpload() {
       
       Object.entries(mappings).forEach(([sheetName, mapping]) => {
         mapping.attendanceColumns.forEach(col => {
-          const date = col.header === "Unknown" 
+          const rawDate = col.header === "Unknown" 
             ? (inferredDates[sheetName]?.[mapping.attendanceColumns.indexOf(col)] || null)
-            : formatExcelDate(col.inferredDate || col.header);
-          if (date) datesToCheck.add(date);
+            : (col.inferredDate || col.header);
+            
+          const formattedDate = formatExcelDate(rawDate);
+          if (formattedDate) datesToCheck.add(formattedDate);
         });
       });
 
@@ -214,6 +235,63 @@ export default function BulkAttendanceUpload() {
         const mapping = sheetMappings[sheetName];
         const inferred = inferredDatesMap[sheetName] || [];
 
+        // Helper for case-insensitive column lookup
+        const getColIdx = (target) => {
+          if (!target) return -1;
+          const exact = headers.indexOf(target);
+          if (exact !== -1) return exact;
+          return headers.findIndex(h => h?.toString().toLowerCase().trim() === target.toString().toLowerCase().trim());
+        };
+
+        // Find USN and Name column indices
+        const usnIdx = getColIdx(mapping?.mapping?.usn);
+        const nameIdx = getColIdx(mapping?.mapping?.name);
+
+        if (usnIdx === -1) {
+          console.error(`USN column not found in sheet ${sheetName}`);
+          continue;
+        }
+
+        // --- PRE-PROCESS STUDENTS ---
+        // Gather unique students from the sheet
+        const studentUpserts = [];
+        const seenUsns = new Set();
+        
+        for (const row of dataRows) {
+          const usn = row[usnIdx]?.toString().toUpperCase().trim();
+          if (!usn || seenUsns.has(usn)) continue;
+          seenUsns.add(usn);
+          
+          const name = nameIdx !== -1 ? row[nameIdx]?.toString().trim() : 'Unknown Student';
+          studentUpserts.push({
+            usn,
+            name: name || 'Unknown Student',
+            branch_code: 'AIML', // Default as required by schema
+            batch: '2024-2028'
+          });
+        }
+
+        const studentIdMap = {}; // usn -> id
+
+        if (studentUpserts.length > 0) {
+          // Upsert students in bulk to ensure they exist
+          const { data: upsertedStudents, error: studentError } = await supabase
+            .from('students')
+            .upsert(studentUpserts, { onConflict: 'usn' })
+            .select('id, usn');
+            
+          if (studentError) {
+            console.error("Student bulk upsert error:", studentError);
+            throw new Error(`Failed to sync students: ${studentError.message}`);
+          }
+          
+          if (upsertedStudents) {
+            upsertedStudents.forEach(s => {
+              studentIdMap[s.usn] = s.id;
+            });
+          }
+        }
+
         // 2. Prepare Sessions
         for (let i = 0; i < mapping.attendanceColumns.length; i++) {
           const colInfo = mapping.attendanceColumns[i];
@@ -241,29 +319,34 @@ export default function BulkAttendanceUpload() {
           // 3. Prepare Attendance for this session
           const attendanceRecords = [];
           
-          // Find USN and Name column indices
-          const usnIdx = headers.indexOf(mapping?.mapping?.usn);
-          const nameIdx = headers.indexOf(mapping?.mapping?.name);
-          const colIdx = colInfo.index;
+          // AI is bad at counting indices. Let's recalculate it if we can!
+          let colIdx = colInfo.index;
+          if (colInfo.header !== "Unknown") {
+            const occurrences = headers.filter(h => h?.toString().toLowerCase().trim() === colInfo.header.toString().toLowerCase().trim()).length;
+            if (occurrences === 1) {
+              const exactIdx = getColIdx(colInfo.header);
+              if (exactIdx !== -1) colIdx = exactIdx;
+            }
+          }
 
           for (const row of dataRows) {
             const usn = row[usnIdx]?.toString().toUpperCase().trim();
             if (!usn) continue;
 
-            // Get student ID (assume students exist or create if needed? 
-            // Better to match against existing students to avoid orphans)
-            const { data: student } = await supabase
-              .from('students')
-              .select('id')
-              .eq('usn', usn)
-              .single();
+            const studentId = studentIdMap[usn];
+            if (!studentId) continue;
 
-            if (!student) continue;
-
-            const isPresent = !!row[colIdx]; // Basic truthy check (P, 1, true, etc)
+            let isPresent = false;
+            const val = row[colIdx];
+            if (val !== undefined && val !== null && val !== '') {
+              const strVal = val.toString().trim().toLowerCase();
+              if (!['a', 'absent', '0', 'false', 'no', 'n'].includes(strVal)) {
+                isPresent = true;
+              }
+            }
             
             attendanceRecords.push({
-              student_id: student.id,
+              student_id: studentId,
               session_id: targetSessionId,
               present: isPresent,
               marked_by: 'bulk_upload'
@@ -275,7 +358,10 @@ export default function BulkAttendanceUpload() {
               .from('attendance')
               .upsert(attendanceRecords, { onConflict: 'student_id, session_id' });
             
-            if (aError) console.error("Attendance Insert Error:", aError);
+            if (aError) {
+              console.error("Attendance Insert Error:", aError);
+              throw new Error(`Failed to insert attendance for session ${formattedDate}: ${aError.message || aError.details || JSON.stringify(aError)}`);
+            }
             attendanceCount += attendanceRecords.length;
           }
         }

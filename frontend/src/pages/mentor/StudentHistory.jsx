@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
+import { supabase, fetchAllAttendance } from '../../lib/supabase';
 import { Search, ChevronRight, User, TrendingUp, Calendar, ArrowLeft, Download } from 'lucide-react';
 
 export default function StudentHistory() {
@@ -29,9 +29,7 @@ export default function StudentHistory() {
         .select('*')
         .order('date', { ascending: false });
 
-      const { data: attendanceData } = await supabase
-        .from('attendance')
-        .select('student_id, present');
+      const attendanceData = await fetchAllAttendance('student_id, present');
 
       const totalSessions = sessionData?.length || 0;
       
